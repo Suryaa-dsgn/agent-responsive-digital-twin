@@ -5,8 +5,9 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Developer Digital Twin',
-  description: 'A demonstration of Agent-Responsive Design principles',
+  title: 'Developer Digital Twin - Agent-Responsive Design',
+  description: 'A demonstration of Agent-Responsive Design principles for bilingual human-AI interfaces',
+  keywords: ['developer digital twin', 'agent-responsive design', 'AI interfaces', 'API design'],
 };
 
 export default function RootLayout({
