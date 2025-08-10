@@ -13,7 +13,7 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 app.use(express.json());
 app.use(cors({
   origin: CORS_ORIGIN,
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'OPTIONS'],
   credentials: true
 }));
 
@@ -23,8 +23,11 @@ app.get('/health', (req, res) => {
 });
 
 // Import routes
-// We'll add actual routes later
+import anthropicRouter from './routes/anthropic';
 // import verifyRouter from './routes/verify';
+
+// Register routes
+app.use('/api/v1/anthropic', anthropicRouter);
 // app.use('/api/v1/verify', verifyRouter);
 
 // Start the server

@@ -7,7 +7,7 @@ import { VerifyRequest } from '../types/api';
 export const verifyRequestSchema = z.object({
   version: z.enum(['traditional', 'ai-first']),
   email: z.string().email().optional()
-});
+}).strict();
 
 /**
  * Type-safe validator for VerifyRequest
@@ -24,7 +24,7 @@ export function validateVerifyRequest(data: unknown): {
   } else {
     return { 
       success: false, 
-      error: result.error.format()._errors.join(', ') || 'Invalid request data'
+      error: result.error.format()._errors?.length ? result.error.format()._errors.join(', ') : 'Invalid request data'
     };
   }
 }

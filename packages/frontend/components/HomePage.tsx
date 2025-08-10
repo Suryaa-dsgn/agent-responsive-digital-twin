@@ -88,7 +88,7 @@ export default function HomePage() {
       <section id="demo" className="container mx-auto px-4 py-16 sm:px-6">
         <h3 className="mb-10 text-center text-2xl font-bold">Explore the Demo Sections</h3>
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+          <Card id="traditional-api" className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
             <CardHeader>
               <CardTitle>Traditional API</CardTitle>
               <CardDescription>Standard error-based API responses</CardDescription>
@@ -110,7 +110,7 @@ export default function HomePage() {
             </CardFooter>
           </Card>
 
-          <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+          <Card id="ai-first-api" className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
             <CardHeader>
               <CardTitle>AI-First API</CardTitle>
               <CardDescription>Context-rich, action-oriented responses</CardDescription>
@@ -132,7 +132,7 @@ export default function HomePage() {
             </CardFooter>
           </Card>
 
-          <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+          <Card id="agent-interface" className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
             <CardHeader>
               <CardTitle>Agent Interface</CardTitle>
               <CardDescription>Direct machine-to-machine communication</CardDescription>
@@ -154,7 +154,7 @@ export default function HomePage() {
             </CardFooter>
           </Card>
 
-          <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md sm:col-span-2 lg:col-span-3">
+          <Card id="comparison" className="overflow-hidden border shadow-sm transition-all hover:shadow-md sm:col-span-2 lg:col-span-3">
             <CardHeader>
               <CardTitle>Side-by-Side Comparison</CardTitle>
               <CardDescription>Traditional vs. AI-First approaches</CardDescription>

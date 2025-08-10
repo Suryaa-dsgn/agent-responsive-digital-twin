@@ -26,7 +26,9 @@ export const errorHandler = (
   console.error(`[ERROR] ${err.message}`);
   console.error(err.stack);
 
-  const statusCode = 'statusCode' in err ? err.statusCode : 500;
+  const rawStatusCode = 'statusCode' in err ? err.statusCode : 500;
+  const statusCode = typeof rawStatusCode === 'number' && 
+    rawStatusCode >= 400 && rawStatusCode <= 599 ? rawStatusCode : 500;
   const message = err.message || 'Internal Server Error';
 
   res.status(statusCode).json({
