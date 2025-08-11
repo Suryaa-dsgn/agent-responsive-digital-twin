@@ -9,14 +9,19 @@
     "lint": "next lint",
     "format": "prettier --write .",
     "check-types": "tsc --noEmit",
-    "validate-client-imports": "tsx lib/validateClientImports.ts"
+    "validate-client-imports": "tsx lib/validateClientImports.ts",
+    "test-redis": "tsx test-rate-limiter.mjs",
+    "test-rate-limit": "tsx test-rate-limiter.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.59.0",
     "@radix-ui/react-navigation-menu": "^1.2.13",
     "@radix-ui/react-slot": "^1.2.3",
+    "ai": "^5.0.9",
     "axios": "^1.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "ioredis": "^5.7.0",
     "lucide-react": "^0.292.0",
     "next": "14.0.0",
     "react": "^18.2.0",

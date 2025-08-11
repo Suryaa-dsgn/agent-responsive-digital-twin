@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
+import DeveloperCommandInterface from './DeveloperCommandInterface';
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -35,7 +36,7 @@ export default function HomePage() {
                 <NavigationMenuTrigger>Demo Sections</NavigationMenuTrigger>
                 <NavigationMenuContent>
                   <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-                    {['Traditional API', 'AI-First API', 'Agent Interface'].map((section) => (
+                    {['Developer Command Interface', 'Semantic Layer Demo', 'Traditional API', 'AI-First API', 'Agent Interface'].map((section) => (
                       <li key={section}>
                         <NavigationMenuLink asChild>
                           <a
@@ -79,8 +80,19 @@ export default function HomePage() {
             className="rounded-md bg-accent px-6 py-2.5 text-white hover:bg-blue-700"
             asChild
           >
-            <Link href="#demo">Experience the Demo</Link>
+            <Link href="#developer-command-interface">Try the Command Interface</Link>
           </Button>
+        </div>
+      </section>
+
+      {/* Developer Command Interface */}
+      <section id="developer-command-interface" className="container mx-auto px-4 py-16 sm:px-6 bg-gray-50">
+        <div className="mx-auto max-w-4xl">
+          <h3 className="mb-6 text-center text-2xl font-bold">Developer Command Interface</h3>
+          <p className="mb-8 text-center text-slate-600">
+            Interact directly with your AI assistant to accomplish development tasks
+          </p>
+          <DeveloperCommandInterface />
         </div>
       </section>
 
@@ -150,6 +162,28 @@ export default function HomePage() {
                 asChild
               >
                 <Link href="#agent-interface">View Section</Link>
+              </Button>
+            </CardFooter>
+          </Card>
+
+          <Card id="semantic-layer" className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+            <CardHeader>
+              <CardTitle>Semantic Layer Demo</CardTitle>
+              <CardDescription>Agent-friendly vs. agent-hostile UI patterns</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-600">
+                Compare how semantic HTML and accessibility attributes make UI components more
+                understandable to both humans and AI agents.
+              </p>
+            </CardContent>
+            <CardFooter>
+              <Button
+                variant="outline"
+                className="border-accent text-accent hover:bg-blue-50"
+                asChild
+              >
+                <Link href="/demos/semantic-layer">Explore Demo</Link>
               </Button>
             </CardFooter>
           </Card>

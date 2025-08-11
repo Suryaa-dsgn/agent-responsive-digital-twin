@@ -102,6 +102,7 @@ export type EnvVarKey =
   // Server-side environment variables
   | 'API_URL'
   | 'ANTHROPIC_API_KEY'
+  | 'REDIS_URL'
   // Client-side public environment variables
   | 'NEXT_PUBLIC_BACKEND_URL';
 

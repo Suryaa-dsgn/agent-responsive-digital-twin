@@ -1,6 +1,6 @@
-import HomePage from '../components/HomePage';
+import DemoDashboard from '../components/DemoDashboard';
 
 export default function Home() {
-  return <HomePage />;
+  return <DemoDashboard />;
 }
 
