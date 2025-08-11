@@ -19,7 +19,7 @@ A demonstration of **Agent-Responsive Design** principles through an interactive
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/agent-responsive-digital-twin.git
+   git clone https://github.com/Suryaa-dsgn/agent-responsive-digital-twin.git
    cd agent-responsive-digital-twin
    ```
 
@@ -28,18 +28,27 @@ A demonstration of **Agent-Responsive Design** principles through an interactive
    npm install
    ```
 
-3. Set up environment variables:
-   - Create `.env.local` in `packages/frontend` with:
+3. Set up environment variables (choose one method):
+
+   #### Option A: Automated Setup (Recommended)
+   ```bash
+   npm run setup
+   ```
+   This will guide you through creating and configuring all required environment files.
+
+   #### Option B: Manual Setup
+   - Copy template files to create environment files:
+     ```bash
+     cp packages/frontend/env.template packages/frontend/.env.local
+     cp packages/backend/env.template packages/backend/.env
      ```
-     ANTHROPIC_API_KEY=your_claude_api_key_here
-     NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
-     NEXT_PUBLIC_GITHUB_REPO_URL=https://github.com/your-org/your-repo
+   - Edit the files with your API keys and settings
+   - Validate your setup:
+     ```bash
+     npm run validate-env
      ```
-   - Create `.env` in `packages/backend` with:
-     ```
-     PORT=3001
-     CORS_ORIGIN=http://localhost:3000
-     ```
+
+   For detailed setup instructions, see [SETUP.md](SETUP.md)
 
 ### Development
 
@@ -53,6 +62,15 @@ Or run them individually:
 npm run dev:frontend
 npm run dev:backend
 ```
+
+#### Frontend-Backend Communication
+
+The frontend communicates with the backend using:
+
+- **Next.js API Proxy**: Requests to `/api/backend/*` are proxied to the backend service
+- **Health Checks**: The frontend monitors backend availability
+- **Fallback Behavior**: Graceful degradation when backend is unavailable
+- **Retry Mechanism**: Automatic retries for transient failures
 
 ### Production Build
 

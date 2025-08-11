@@ -65,7 +65,18 @@ export const verifyNoServerEnvInClient = (filePath: string, fileContents: string
  * @returns boolean indicating if all required environment variables are valid
  */
 export const validateEnvironment = (): boolean => {
-  const requiredVars: EnvVarKey[] = ['NEXT_PUBLIC_BACKEND_URL'];
+  const requiredVars: EnvVarKey[] = [
+    'NEXT_PUBLIC_BACKEND_URL', 
+    'ANTHROPIC_API_KEY'
+  ];
+  
+  // Optional vars that should be checked but won't block startup
+  const optionalVars: EnvVarKey[] = [
+    'REDIS_URL',
+    'NEXT_PUBLIC_ENABLE_AI_FEATURES',
+    'NEXT_PUBLIC_GITHUB_REPO_URL'
+  ];
+  
   const missingVars = requiredVars.filter(
     (varName) => !process.env[varName]
   );
@@ -79,9 +90,23 @@ export const validateEnvironment = (): boolean => {
     return false;
   }
   
+  // Check for placeholder values in required vars
   const placeholderVars = requiredVars.filter(
     (varName) => process.env[varName] && isPlaceholderValue(process.env[varName] as string)
   );
+  
+  // Also warn about optional vars with placeholder values
+  const optionalPlaceholders = optionalVars.filter(
+    (varName) => process.env[varName] && isPlaceholderValue(process.env[varName] as string)
+  );
+  
+  // Log warnings for optional placeholders
+  if (optionalPlaceholders.length > 0) {
+    console.warn(
+      `Warning: Some optional environment variables contain placeholder values: ${optionalPlaceholders.join(', ')}\n` +
+      `These variables are not required but may affect functionality.`
+    );
+  }
   
   if (placeholderVars.length > 0) {
     console.error(
@@ -103,14 +128,21 @@ export type EnvVarKey =
   | 'API_URL'
   | 'ANTHROPIC_API_KEY'
   | 'REDIS_URL'
+  | 'LOG_LEVEL'
   // Client-side public environment variables
-  | 'NEXT_PUBLIC_BACKEND_URL';
+  | 'NEXT_PUBLIC_BACKEND_URL'
+  | 'NEXT_PUBLIC_ENABLE_AI_FEATURES'
+  | 'NEXT_PUBLIC_ANALYTICS_ID'
+  | 'NEXT_PUBLIC_GITHUB_REPO_URL';
 
 /**
  * Pre-validated static environment variables for client components
  * Use these constants in client components instead of getEnvVar
  */
 export const PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
+export const ENABLE_AI_FEATURES = process.env.NEXT_PUBLIC_ENABLE_AI_FEATURES === 'true';
+export const ANALYTICS_ID = process.env.NEXT_PUBLIC_ANALYTICS_ID || '';
+export const GITHUB_REPO_URL = process.env.NEXT_PUBLIC_GITHUB_REPO_URL || '';
 
 // Validate public env vars and warn about missing ones
 if (!PUBLIC_BACKEND_URL || isPlaceholderValue(PUBLIC_BACKEND_URL)) {

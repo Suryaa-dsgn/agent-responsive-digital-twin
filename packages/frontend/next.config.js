@@ -4,6 +4,54 @@ const nextConfig = {
   experimental: {
     serverActions: true,
   },
+  
+  // Image optimization configuration
+  images: {
+    domains: [],
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60,
+  },
+  
+  // Enable SWC minification for faster builds
+  swcMinify: true,
+  
+  // API route proxy configuration
+  async rewrites() {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    return [
+      {
+        source: '/api/backend/:path*',
+        destination: `${backendUrl}/api/:path*`,
+      },
+      {
+        source: '/health',
+        destination: `${backendUrl}/health`,
+      },
+    ];
+  },
+  
+  // HTTP response headers
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
