@@ -33,6 +33,7 @@ A demonstration of **Agent-Responsive Design** principles through an interactive
      ```
      ANTHROPIC_API_KEY=your_claude_api_key_here
      NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
+     NEXT_PUBLIC_GITHUB_REPO_URL=https://github.com/your-org/your-repo
      ```
    - Create `.env` in `packages/backend` with:
      ```

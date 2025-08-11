@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 
 // Define types for our API responses
 interface ApiResponse {
@@ -29,9 +29,14 @@ export function APIEvolutionDemo() {
     try {
       const response = await axios.post('/api/evolution-demo', payload);
       setResponseData(JSON.stringify(response.data, null, 2));
-    } catch (err: any) {
-      setError(err.message || 'An unknown error occurred');
-      if (err.response?.data) {
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
+      
+      if (isAxiosError(err) && err.response?.data) {
         setResponseData(JSON.stringify(err.response.data, null, 2));
       }
     } finally {

@@ -95,12 +95,34 @@ export async function POST(request: NextRequest) {
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     }
-  } catch (error: unknown) {
+  }   catch (error: unknown) {
     // Error handling with different formats based on API version
-    const requestUrl = new URL(request.url);
-    const versionParam = requestUrl.searchParams.get('version') || 'traditional';
+    let version = 'traditional';
     
-    if (versionParam === 'traditional') {
+    // Try to safely get version from body first
+    try {
+      // Clone the request to avoid errors from already-read body
+      const clonedRequest = request.clone();
+      const body = await clonedRequest.json().catch(() => ({}));
+      if (body && body.version && 
+          (body.version === 'traditional' || body.version === 'ai-first')) {
+        version = body.version;
+      }
+    } catch {
+      // Silently continue if body parsing fails
+    }
+    
+    // Fall back to query param if body version is not valid
+    if (version === 'traditional') {
+      const requestUrl = new URL(request.url);
+      const versionParam = requestUrl.searchParams.get('version');
+      if (versionParam && 
+          (versionParam === 'traditional' || versionParam === 'ai-first')) {
+        version = versionParam;
+      }
+    }
+    
+    if (version === 'traditional') {
       return new Response(
         JSON.stringify({
           success: false,

@@ -15,6 +15,8 @@ import DeveloperCommandInterface from './DeveloperCommandInterface';
 import { SemanticLayerDemo } from './SemanticLayerDemo';
 import { APIEvolutionDemo } from './APIEvolutionDemo';
 
+const GITHUB_REPO_URL = process.env.NEXT_PUBLIC_GITHUB_REPO_URL || 'https://github.com/your-org/your-repo';
+
 // Demo sections for navigation
 const DEMO_SECTIONS = [
   { id: 'command-interface', name: 'Developer Command Interface' },
@@ -86,7 +88,7 @@ export default function DemoDashboard() {
                 </NavigationMenuItem>
               ))}
               <NavigationMenuItem>
-                <Link href="https://github.com/yourusername/ai-agent-demos" target="_blank" legacyBehavior passHref>
+                <Link href={GITHUB_REPO_URL} target="_blank" legacyBehavior passHref>
                   <NavigationMenuLink className={navigationMenuTriggerStyle()}>GitHub</NavigationMenuLink>
                 </Link>
               </NavigationMenuItem>
@@ -265,7 +267,7 @@ export default function DemoDashboard() {
             </div>
             <div className="flex space-x-6">
               <Link 
-                href="https://github.com/yourusername/ai-agent-demos" 
+                href={GITHUB_REPO_URL} 
                 target="_blank"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
