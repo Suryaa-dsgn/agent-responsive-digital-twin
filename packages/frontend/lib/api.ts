@@ -98,19 +98,24 @@ export const apiClient = {
 
   /**
    * Check if the backend is available
+   * @param config - Optional axios config including abort signal
    * @returns true if backend is available, false otherwise
    */
-  async isBackendAvailable(): Promise<boolean> {
+  async isBackendAvailable(config?: AxiosRequestConfig): Promise<boolean> {
     try {
       // Use the health endpoint through our proxy when in browser
-      const healthEndpoint = IS_BROWSER ? '/health' : `${API_BASE_URL}/health`;
+      const healthEndpoint = '/health';
       
-      await axios.get(healthEndpoint, { 
-        timeout: 3000 
-      });
+      // Use the shared API client instead of creating a new axios instance
+      await apiClient.get(healthEndpoint, { timeout: 3000, ...config });
       return true;
     } catch (error) {
-      console.warn('Backend health check failed:', error instanceof Error ? error.message : 'Unknown error');
+      if (axios.isCancel(error)) {
+        // Request was cancelled, likely due to component unmount
+        console.log('Backend health check cancelled');
+      } else {
+        console.warn('Backend health check failed:', error instanceof Error ? error.message : 'Unknown error');
+      }
       return false;
     }
   },

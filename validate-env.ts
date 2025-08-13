@@ -37,7 +37,8 @@ function validateEnvFile(filePath: string, requiredVars: string[]): boolean {
   try {
     envConfig = dotenv.parse(fs.readFileSync(filePath));
   } catch (error) {
-    console.error(`❌ Error parsing ${filePath}: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`❌ Error parsing ${filePath}: ${errorMessage}`);
     console.error('The environment file might be malformed or inaccessible');
     return false;
   }

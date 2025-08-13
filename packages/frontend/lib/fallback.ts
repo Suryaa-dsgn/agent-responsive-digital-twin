@@ -3,14 +3,57 @@
  */
 
 /**
+ * Type definitions for mock data returned by getMockData
+ */
+export interface UserMock {
+  type: 'user';
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+export interface ApiResponseMock {
+  type: 'api-response';
+  success: boolean;
+  data: {
+    message: string;
+    timestamp: string;
+    source: string;
+  };
+}
+
+export interface DemoDataMock {
+  type: 'demo-data';
+  title: string;
+  items: Array<{
+    id: number;
+    name: string;
+    status: string;
+  }>;
+  lastUpdated: string;
+}
+
+export interface ErrorMock {
+  type: 'error';
+  error: string;
+}
+
+export type MockData = UserMock | ApiResponseMock | DemoDataMock | ErrorMock;
+
+/**
  * Generate mock data for when backend is unavailable
  * @param type The type of mock data to generate
- * @returns Mock data object
+ * @returns Mock data object with appropriate type
  */
-export function getMockData(type: 'user' | 'api-response' | 'demo-data') {
+export function getMockData(type: 'user'): UserMock;
+export function getMockData(type: 'api-response'): ApiResponseMock;
+export function getMockData(type: 'demo-data'): DemoDataMock;
+export function getMockData(type: string): MockData {
   switch (type) {
     case 'user':
       return {
+        type: 'user',
         id: 'mock-user-1',
         name: 'Demo User',
         email: 'demo@example.com',
@@ -19,6 +62,7 @@ export function getMockData(type: 'user' | 'api-response' | 'demo-data') {
     
     case 'api-response':
       return {
+        type: 'api-response',
         success: true,
         data: {
           message: 'This is simulated data since the backend is unavailable.',
@@ -29,6 +73,7 @@ export function getMockData(type: 'user' | 'api-response' | 'demo-data') {
       
     case 'demo-data':
       return {
+        type: 'demo-data',
         title: 'Demo Data (Offline Mode)',
         items: [
           { id: 1, name: 'Simulated Item 1', status: 'active' },
@@ -39,7 +84,10 @@ export function getMockData(type: 'user' | 'api-response' | 'demo-data') {
       };
       
     default:
-      return { error: 'Unknown mock data type requested' };
+      return {
+        type: 'error',
+        error: 'Unknown mock data type requested'
+      };
   }
 }
 

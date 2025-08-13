@@ -11,6 +11,8 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { execSync } = require('child_process');
+const { createInterface } = require('readline');
+const { Writable } = require('stream');
 
 // Setup readline interface
 const rl = readline.createInterface({
@@ -18,11 +20,141 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
-// Helper function to ask questions
+// Helper function to ask questions with input validation
 function ask(question) {
   return new Promise((resolve) => {
     rl.question(`\x1b[36m${question}\x1b[0m `, (answer) => {
-      resolve(answer.trim());
+      const trimmed = answer.trim();
+      
+      // Reject inputs with potentially dangerous characters
+      if (trimmed.includes('\n') || trimmed.includes('\r')) {
+        console.log('\x1b[31mInvalid input: newlines not allowed\x1b[0m');
+        return ask(question).then(resolve);
+      }
+      
+      // Check for command injection attempts
+      if (/[;&|`$()]/.test(trimmed)) {
+        console.log('\x1b[31mInvalid input: potentially dangerous characters detected\x1b[0m');
+        return ask(question).then(resolve);
+      }
+      
+      // Check for extremely long inputs that might be used for DoS
+      if (trimmed.length > 1000) {
+        console.log('\x1b[31mInvalid input: input too long\x1b[0m');
+        return ask(question).then(resolve);
+      }
+      
+      // Check for null bytes which can cause issues in some systems
+      if (trimmed.includes('\0')) {
+        console.log('\x1b[31mInvalid input: null bytes not allowed\x1b[0m');
+        return ask(question).then(resolve);
+      }
+      
+      resolve(trimmed);
+    });
+  });
+}
+
+// Helper function to ask for sensitive information (like passwords/API keys)
+function askSecret(question) {
+  return new Promise((resolve) => {
+    // Create a writable stream that doesn't write the input
+    const muted = new Writable({
+      write: function(chunk, encoding, callback) {
+        callback();
+      }
+    });
+    
+    // Create custom readline interface that doesn't echo input
+    const secureRl = createInterface({
+      input: process.stdin,
+      output: muted,
+      terminal: true
+    });
+    
+    process.stdout.write(`\x1b[36m${question}\x1b[0m `);
+    
+    // Save the original configurations
+    const originalStdinRawMode = process.stdin.isRaw;
+    
+    // Set raw mode to handle input manually
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(true);
+    }
+    
+    let input = '';
+    
+    // Create listeners for stdin
+    const onData = (key) => {
+      // Ctrl+C
+      if (key.toString() === '\u0003') {
+        process.exit();
+      }
+      
+      // Enter key
+      if (key.toString() === '\r' || key.toString() === '\n') {
+        process.stdout.write('\n');
+        cleanup();
+        
+        // Enhanced validation for secure input
+        if (input.includes('\n') || input.includes('\r')) {
+          console.log('\x1b[31mInvalid input: newlines not allowed\x1b[0m');
+          // Restart the askSecret function
+          return askSecret(question).then(resolve);
+        }
+        
+        // Check for command injection attempts
+        if (/[;&|`$()]/.test(input)) {
+          console.log('\x1b[31mInvalid input: potentially dangerous characters detected\x1b[0m');
+          return askSecret(question).then(resolve);
+        }
+        
+        // Check for extremely long inputs that might be used for DoS
+        if (input.length > 1000) {
+          console.log('\x1b[31mInvalid input: input too long\x1b[0m');
+          return askSecret(question).then(resolve);
+        }
+        
+        // Check for null bytes which can cause issues in some systems
+        if (input.includes('\0')) {
+          console.log('\x1b[31mInvalid input: null bytes not allowed\x1b[0m');
+          return askSecret(question).then(resolve);
+        }
+        
+        resolve(input);
+        return;
+      }
+      
+      // Backspace/Delete
+      if (key.toString() === '\u007f' || key.toString() === '\b') {
+        if (input.length > 0) {
+          input = input.substring(0, input.length - 1);
+          process.stdout.write('\b \b'); // Erase last * character
+        }
+        return;
+      }
+      
+      // Regular character
+      input += key.toString();
+      process.stdout.write('*');
+    };
+    
+    const cleanup = () => {
+      // Restore original settings
+      process.stdin.removeListener('data', onData);
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(originalStdinRawMode);
+      }
+      secureRl.close();
+    };
+    
+    // Listen for user input
+    process.stdin.on('data', onData);
+    
+    // Handle interruption
+    secureRl.on('SIGINT', () => {
+      cleanup();
+      process.exit();
     });
   });
 }
@@ -42,16 +174,63 @@ function fileExists(filePath) {
   }
 }
 
-// Helper to copy template file to destination
+// Helper to copy template file to destination securely
 function copyTemplate(templatePath, destPath) {
+  // Validate paths
+  if (!templatePath || typeof templatePath !== 'string' || templatePath.trim() === '') {
+    console.log('\x1b[31mError: Invalid template path provided\x1b[0m');
+    return false;
+  }
+  
+  if (!destPath || typeof destPath !== 'string' || destPath.trim() === '') {
+    console.log('\x1b[31mError: Invalid destination path provided\x1b[0m');
+    return false;
+  }
+  
+  // Prevent directory traversal
+  if (templatePath.includes('..') || destPath.includes('..')) {
+    console.log('\x1b[31mError: Path contains directory traversal patterns\x1b[0m');
+    return false;
+  }
+  
+  // Ensure template path ends with expected extensions
+  if (!templatePath.endsWith('.template') && !templatePath.endsWith('env.template')) {
+    console.log('\x1b[31mWarning: Template file has unexpected extension\x1b[0m');
+  }
+  
+  // Ensure destination path is an env file
+  if (!destPath.endsWith('.env') && !destPath.endsWith('.env.local')) {
+    console.log('\x1b[31mError: Destination must be an env file\x1b[0m');
+    return false;
+  }
+  
   if (!fileExists(templatePath)) {
     console.log(`\x1b[31mTemplate file not found: ${templatePath}\x1b[0m`);
     return false;
   }
   
   try {
+    // Read the template file
     const content = fs.readFileSync(templatePath, 'utf8');
-    fs.writeFileSync(destPath, content);
+    
+    // Check for unusually large files (potential DoS)
+    if (content.length > 1024 * 50) { // 50KB limit for env files
+      console.log('\x1b[31mWarning: Template file is unusually large\x1b[0m');
+      const proceed = 'n';
+      if (proceed.toLowerCase() !== 'y') {
+        return false;
+      }
+    }
+    
+    // Use atomic write pattern with a temporary file
+    const tempFilePath = `${destPath}.tmp`;
+    
+    // Write to temp file with secure permissions
+    fs.writeFileSync(tempFilePath, content, { mode: 0o600 }); // Only owner can read/write
+    
+    // Atomically replace the original file
+    fs.renameSync(tempFilePath, destPath);
+    
     return true;
   } catch (err) {
     console.log(`\x1b[31mError copying template: ${err.message}\x1b[0m`);
@@ -62,22 +241,230 @@ function copyTemplate(templatePath, destPath) {
 // Helper to update env file with a value
 function updateEnvFile(filePath, key, value) {
   try {
-    let content = fs.readFileSync(filePath, 'utf8');
-    
-    // Check if the key already exists
-    const regex = new RegExp(`^${key}=.*$`, 'm');
-    if (regex.test(content)) {
-      content = content.replace(regex, `${key}=${value}`);
-    } else {
-      content += `\n${key}=${value}`;
+    // Validate filePath
+    if (!filePath || typeof filePath !== 'string' || filePath.trim() === '') {
+      console.log('\x1b[31mError: Invalid file path provided\x1b[0m');
+      return false;
     }
     
-    fs.writeFileSync(filePath, content);
+    // Prevent directory traversal by ensuring filePath doesn't contain suspicious patterns
+    if (filePath.includes('..') || !filePath.endsWith('.env') && !filePath.endsWith('.env.local')) {
+      console.log('\x1b[31mError: Invalid env file path\x1b[0m');
+      return false;
+    }
+    
+    // Validate key and value for security
+    if (!key || typeof key !== 'string' || key.length === 0) {
+      console.log('\x1b[31mError: Invalid key provided\x1b[0m');
+      return false;
+    }
+    
+    // Validate key format (allow only alphanumeric, underscore)
+    if (!/^[A-Za-z0-9_]+$/.test(key)) {
+      console.log('\x1b[31mError: Environment variable keys should only contain letters, numbers, and underscores\x1b[0m');
+      return false;
+    }
+    
+    // Maximum key length to prevent excessive data
+    if (key.length > 100) {
+      console.log('\x1b[31mError: Environment variable key is too long\x1b[0m');
+      return false;
+    }
+    
+    // Validate value to prevent injection
+    if (value === undefined || value === null) {
+      console.log('\x1b[31mError: Value cannot be null or undefined\x1b[0m');
+      return false;
+    }
+    
+    // Ensure value is a string and sanitize
+    let stringValue = String(value);
+    
+    // Maximum value length to prevent excessive data
+    if (stringValue.length > 5000) {
+      console.log('\x1b[31mError: Environment variable value is too long\x1b[0m');
+      return false;
+    }
+    
+    // Check for null bytes which can cause issues in some systems
+    if (stringValue.includes('\0')) {
+      console.log('\x1b[31mError: Value contains null bytes which are not allowed\x1b[0m');
+      return false;
+    }
+    
+    // Check for problematic characters in value
+    const dangerousPatterns = ['`', '$(', '${', ';', '&&', '||', '|', '>', '<', '\\n'];
+    const foundPattern = dangerousPatterns.find(pattern => stringValue.includes(pattern));
+    
+    if (foundPattern) {
+      console.log(`\x1b[31mWarning: Value contains "${foundPattern}" which might be used for command injection\x1b[0m`);
+      // Escape value by wrapping in quotes to prevent command execution
+      stringValue = JSON.stringify(stringValue).slice(1, -1);
+      console.log('\x1b[33mValue has been escaped for safety\x1b[0m');
+    }
+    
+    // Read content and validate file exists
+    if (!fs.existsSync(filePath)) {
+      console.log('\x1b[33mFile does not exist, creating it\x1b[0m');
+      fs.writeFileSync(filePath, '', { mode: 0o600 }); // Secure permissions
+    }
+    
+    let content = fs.readFileSync(filePath, 'utf8');
+    
+    // Escape regex special characters in the key
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // Check if the key already exists
+    const regex = new RegExp(`^${escapedKey}=.*$`, 'm');
+    if (regex.test(content)) {
+      content = content.replace(regex, `${key}=${stringValue}`);
+    } else {
+      // Ensure there's a newline at the end if file is not empty
+      if (content.length > 0 && !content.endsWith('\n')) {
+        content += '\n';
+      }
+      content += `${key}=${stringValue}`;
+    }
+    
+    // Use atomic write pattern with a temporary file
+    const tempFilePath = `${filePath}.tmp`;
+    // Get original file mode to preserve permissions
+    const stats = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
+    // Write to temp file with restricted permissions
+    fs.writeFileSync(tempFilePath, content, { mode: 0o600 }); // Only owner can read/write
+    // Preserve original file mode if it existed
+    if (stats) {
+      fs.chmodSync(tempFilePath, stats.mode);
+    }
+    // Atomically replace the original file
+    fs.renameSync(tempFilePath, filePath);
+    
     return true;
   } catch (err) {
     console.log(`\x1b[31mError updating env file: ${err.message}\x1b[0m`);
     return false;
   }
+}
+
+// Helper to validate URLs
+function validateUrl(url) {
+  if (!url || typeof url !== 'string' || url.trim() === '') {
+    return { valid: false, message: 'URL cannot be empty' };
+  }
+  
+  const trimmedUrl = url.trim();
+  
+  // Check for potentially dangerous characters
+  if (/[;&|`$()]/.test(trimmedUrl)) {
+    return { 
+      valid: false, 
+      message: 'URL contains potentially dangerous characters' 
+    };
+  }
+  
+  // Check for extremely long URLs that might be used for DoS
+  if (trimmedUrl.length > 2000) {
+    return { 
+      valid: false, 
+      message: 'URL is too long (exceeds 2000 characters)' 
+    };
+  }
+  
+  // Check for null bytes which can cause issues in some systems
+  if (trimmedUrl.includes('\0')) {
+    return { 
+      valid: false, 
+      message: 'URL contains null bytes which are not allowed' 
+    };
+  }
+  
+  // Check if it's a valid URL format
+  try {
+    const urlObj = new URL(trimmedUrl);
+    
+    // Validate protocol (only allow http/https)
+    if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:' && 
+        urlObj.protocol !== 'redis:' && urlObj.protocol !== 'rediss:') {
+      return { 
+        valid: false, 
+        message: `Invalid protocol: ${urlObj.protocol}. Only http:, https:, redis:, and rediss: are allowed.` 
+      };
+    }
+    
+    return { valid: true };
+  } catch (e) {
+    return { valid: false, message: 'Invalid URL format' };
+  }
+}
+
+// Helper to validate API keys
+function validateApiKey(key, type = 'general') {
+  if (!key || typeof key !== 'string' || key.trim() === '') {
+    return { valid: false, message: 'API key cannot be empty' };
+  }
+  
+  // Remove any whitespace
+  const trimmedKey = key.trim();
+  
+  // General API key validation
+  if (trimmedKey.length < 10) {
+    return { 
+      valid: false, 
+      message: 'API key appears too short (should be at least 10 characters)'
+    };
+  }
+  
+  if (trimmedKey.length > 200) {
+    return { 
+      valid: false, 
+      message: 'API key appears too long (exceeds 200 characters)'
+    };
+  }
+  
+  // Check for common API key patterns based on type
+  if (type === 'anthropic') {
+    // Anthropic API keys typically start with 'sk-ant-' and are long
+    if (!trimmedKey.startsWith('sk-ant-')) {
+      return { 
+        valid: false, 
+        message: 'Anthropic API keys typically start with "sk-ant-"' 
+      };
+    }
+    
+    // Anthropic keys are typically at least 30 characters
+    if (trimmedKey.length < 30) {
+      return { 
+        valid: false, 
+        message: 'Anthropic API key appears too short' 
+      };
+    }
+    
+    // Check for valid Anthropic key format (alphanumeric with hyphens)
+    if (!/^sk-ant-[a-zA-Z0-9-]+$/.test(trimmedKey)) {
+      return { 
+        valid: false, 
+        message: 'Anthropic API key contains invalid characters' 
+      };
+    }
+  }
+  
+  // Check for potentially harmful characters
+  if (/[;&|`$()]/.test(trimmedKey)) {
+    return { 
+      valid: false, 
+      message: 'API key contains potentially dangerous characters' 
+    };
+  }
+  
+  // Check for common security issues like hardcoded test keys
+  if (/test|demo|sample|example/i.test(trimmedKey)) {
+    return { 
+      valid: false, 
+      message: 'API key appears to be a test/demo key' 
+    };
+  }
+  
+  return { valid: true };
 }
 
 // Main setup function
@@ -150,8 +537,35 @@ async function setup() {
       console.log('\nTo use Redis Cloud:');
       console.log('1. Sign up at https://redis.com/try-free/');
       console.log('2. Create a new subscription and database');
-      const redisUrl = await ask('Enter your Redis Cloud URL:');
-      if (redisUrl) {
+      let redisUrl;
+      let isValidRedisUrl = false;
+      
+      do {
+        redisUrl = await ask('Enter your Redis Cloud URL:');
+        if (!redisUrl) {
+          const skipRedis = await ask('Continue without Redis? (y/n)');
+          if (skipRedis.toLowerCase() === 'y') break;
+        } else {
+          // Validate Redis URL format (should start with redis:// or rediss://)
+          if (!redisUrl.startsWith('redis://') && !redisUrl.startsWith('rediss://')) {
+            console.log('\x1b[31mError: Redis URL should start with redis:// or rediss://\x1b[0m');
+          } else {
+            const validation = validateUrl(redisUrl);
+            if (validation.valid) {
+              isValidRedisUrl = true;
+            } else {
+              console.log(`\x1b[31mInvalid Redis URL: ${validation.message}\x1b[0m`);
+            }
+          }
+          
+          if (!isValidRedisUrl) {
+            const retry = await ask('Would you like to try again? (y/n)');
+            if (retry.toLowerCase() !== 'y') break;
+          }
+        }
+      } while (!isValidRedisUrl && redisUrl);
+      
+      if (redisUrl && isValidRedisUrl) {
         updateEnvFile(frontendEnvDest, 'REDIS_URL', redisUrl);
         console.log('\x1b[32mRedis Cloud configuration saved!\x1b[0m');
       }
@@ -189,22 +603,86 @@ async function setupFrontendEnv(templatePath, destPath) {
   if (copyTemplate(templatePath, destPath)) {
     console.log('\x1b[32mCreated frontend .env.local file from template.\x1b[0m');
     
-    // Get Anthropic API key
-    const anthropicKey = await ask('Enter your Anthropic API key (get one from https://console.anthropic.com/):');
-    if (anthropicKey) {
+    // Get and validate Anthropic API key (using masked input)
+    let anthropicKey;
+    let isValidKey = false;
+    
+    do {
+      anthropicKey = await askSecret('Enter your Anthropic API key (get one from https://console.anthropic.com/):');
+      if (!anthropicKey) {
+        console.log('\x1b[33mWarning: Anthropic API key is required for full functionality.\x1b[0m');
+        const skipKey = await ask('Continue without an API key? (y/n)');
+        if (skipKey.toLowerCase() === 'y') break;
+      } else {
+        const validation = validateApiKey(anthropicKey, 'anthropic');
+        if (validation.valid) {
+          isValidKey = true;
+        } else {
+          console.log(`\x1b[31mInvalid API key: ${validation.message}\x1b[0m`);
+          const retry = await ask('Would you like to try again? (y/n)');
+          if (retry.toLowerCase() !== 'y') break;
+        }
+      }
+    } while (!isValidKey && anthropicKey);
+    
+    if (anthropicKey && isValidKey) {
       updateEnvFile(destPath, 'ANTHROPIC_API_KEY', anthropicKey);
+    } else {
+      console.log('\x1b[33mWarning: Valid Anthropic API key is required for full functionality.\x1b[0m');
     }
     
-    // Ask for backend URL
-    const backendUrl = await ask('Enter backend URL (default: http://localhost:3001):');
-    if (backendUrl) {
-      updateEnvFile(destPath, 'NEXT_PUBLIC_BACKEND_URL', backendUrl);
-    }
+    // Ask for backend URL with validation
+    let backendUrl;
+    let isValidUrl = false;
     
-    // Ask for GitHub repo URL
-    const repoUrl = await ask('Enter GitHub repo URL (optional):');
+    do {
+      backendUrl = await ask('Enter backend URL (default: http://localhost:3001):');
+      
+      if (!backendUrl) {
+        // Default value is acceptable
+        backendUrl = 'http://localhost:3001';
+        isValidUrl = true;
+      } else {
+        const validation = validateUrl(backendUrl);
+        if (validation.valid) {
+          isValidUrl = true;
+        } else {
+          console.log(`\x1b[31mInvalid URL: ${validation.message}\x1b[0m`);
+          const retry = await ask('Would you like to try again? (y/n)');
+          if (retry.toLowerCase() !== 'y') {
+            backendUrl = 'http://localhost:3001';
+            isValidUrl = true;
+            console.log('\x1b[32mUsing default URL: http://localhost:3001\x1b[0m');
+          }
+        }
+      }
+    } while (!isValidUrl);
+    
+    updateEnvFile(destPath, 'NEXT_PUBLIC_BACKEND_URL', backendUrl);
+    
+    // Ask for GitHub repo URL with validation
+    let repoUrl = await ask('Enter GitHub repo URL (optional):');
+    
     if (repoUrl) {
-      updateEnvFile(destPath, 'NEXT_PUBLIC_GITHUB_REPO_URL', repoUrl);
+      // Basic GitHub URL validation
+      if (!repoUrl.startsWith('https://github.com/') && !repoUrl.startsWith('http://github.com/')) {
+        console.log('\x1b[33mWarning: URL does not seem to be a GitHub repository URL.\x1b[0m');
+        const confirm = await ask('Continue with this URL anyway? (y/n)');
+        if (confirm.toLowerCase() !== 'y') {
+          repoUrl = '';
+        }
+      } else {
+        // Further validate the URL format
+        const validation = validateUrl(repoUrl);
+        if (!validation.valid) {
+          console.log(`\x1b[31mInvalid URL: ${validation.message}\x1b[0m`);
+          repoUrl = '';
+        }
+      }
+      
+      if (repoUrl) {
+        updateEnvFile(destPath, 'NEXT_PUBLIC_GITHUB_REPO_URL', repoUrl);
+      }
     }
     
     console.log('\x1b[32mFrontend environment configured successfully!\x1b[0m');
@@ -218,24 +696,105 @@ async function setupBackendEnv(templatePath, destPath) {
   if (copyTemplate(templatePath, destPath)) {
     console.log('\x1b[32mCreated backend .env file from template.\x1b[0m');
     
-    // Get Anthropic API key
+    // Get and validate Anthropic API key (using masked input)
     console.log('We need the same Anthropic API key for the backend:');
-    const anthropicKey = await ask('Enter your Anthropic API key:');
-    if (anthropicKey) {
+    let anthropicKey;
+    let isValidKey = false;
+    
+    do {
+      anthropicKey = await askSecret('Enter your Anthropic API key:');
+      if (!anthropicKey) {
+        console.log('\x1b[33mWarning: Anthropic API key is required for full functionality.\x1b[0m');
+        const skipKey = await ask('Continue without an API key? (y/n)');
+        if (skipKey.toLowerCase() === 'y') break;
+      } else {
+        const validation = validateApiKey(anthropicKey, 'anthropic');
+        if (validation.valid) {
+          isValidKey = true;
+        } else {
+          console.log(`\x1b[31mInvalid API key: ${validation.message}\x1b[0m`);
+          const retry = await ask('Would you like to try again? (y/n)');
+          if (retry.toLowerCase() !== 'y') break;
+        }
+      }
+    } while (!isValidKey && anthropicKey);
+    
+    if (anthropicKey && isValidKey) {
       updateEnvFile(destPath, 'ANTHROPIC_API_KEY', anthropicKey);
+    } else {
+      console.log('\x1b[33mWarning: Valid Anthropic API key is required for full functionality.\x1b[0m');
     }
     
-    // Ask for port
-    const port = await ask('Enter backend port (default: 3001):');
-    if (port) {
-      updateEnvFile(destPath, 'PORT', port);
-    }
+    // Ask for port with validation
+    let port;
+    let isValidPort = false;
     
-    // Ask for CORS origin
-    const corsOrigin = await ask('Enter CORS origin (default: http://localhost:3000):');
-    if (corsOrigin) {
-      updateEnvFile(destPath, 'CORS_ORIGIN', corsOrigin);
-    }
+    do {
+      port = await ask('Enter backend port (default: 3001):');
+      
+      if (!port) {
+        // Default value is acceptable
+        port = '3001';
+        isValidPort = true;
+      } else if (!/^\d+$/.test(port)) {
+        console.log('\x1b[31mError: Port must be a number\x1b[0m');
+      } else if (parseInt(port) < 1024 || parseInt(port) > 65535) {
+        console.log('\x1b[31mWarning: Port should be between 1024 and 65535\x1b[0m');
+        const continueWithPort = await ask('Continue with this port anyway? (y/n)');
+        if (continueWithPort.toLowerCase() === 'y') {
+          isValidPort = true;
+        }
+      } else {
+        isValidPort = true;
+      }
+      
+      if (!isValidPort) {
+        const retry = await ask('Would you like to try again? (y/n)');
+        if (retry.toLowerCase() !== 'y') {
+          port = '3001'; // Use default if user gives up
+          isValidPort = true;
+          console.log('\x1b[32mUsing default port: 3001\x1b[0m');
+        }
+      }
+    } while (!isValidPort);
+    
+    updateEnvFile(destPath, 'PORT', port);
+    
+    // Ask for CORS origin with validation
+    let corsOrigin;
+    let isValidOrigin = false;
+    
+    do {
+      corsOrigin = await ask('Enter CORS origin (default: http://localhost:3000):');
+      
+      if (!corsOrigin) {
+        // Default value is acceptable
+        corsOrigin = 'http://localhost:3000';
+        isValidOrigin = true;
+      } else if (corsOrigin === '*') {
+        // Allow wildcard, but warn
+        console.log('\x1b[33mWarning: Using wildcard (*) for CORS is not recommended for production.\x1b[0m');
+        const confirm = await ask('Are you sure you want to use wildcard CORS? (y/n)');
+        if (confirm.toLowerCase() === 'y') {
+          isValidOrigin = true;
+        }
+      } else {
+        const validation = validateUrl(corsOrigin);
+        if (validation.valid) {
+          isValidOrigin = true;
+        } else {
+          console.log(`\x1b[31mInvalid URL for CORS: ${validation.message}\x1b[0m`);
+          const retry = await ask('Would you like to try again? (y/n)');
+          if (retry.toLowerCase() !== 'y') {
+            corsOrigin = 'http://localhost:3000';
+            isValidOrigin = true;
+            console.log('\x1b[32mUsing default CORS origin: http://localhost:3000\x1b[0m');
+          }
+        }
+      }
+    } while (!isValidOrigin);
+    
+    updateEnvFile(destPath, 'CORS_ORIGIN', corsOrigin);
     
     console.log('\x1b[32mBackend environment configured successfully!\x1b[0m');
   }

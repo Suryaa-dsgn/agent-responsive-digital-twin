@@ -9,6 +9,11 @@ Before you begin, make sure you have the following installed:
 - npm (v8 or higher)
 - Redis (optional, for rate limiting)
 
+## Security Features
+
+The setup script includes the following security features:
+- Masked password input for sensitive information like API keys
+
 ## Getting Started
 
 ### 1. Clone the Repository

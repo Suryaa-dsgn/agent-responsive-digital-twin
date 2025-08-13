@@ -35,6 +35,9 @@ A demonstration of **Agent-Responsive Design** principles through an interactive
    npm run setup
    ```
    This will guide you through creating and configuring all required environment files.
+   
+   > Note: The `setup` script needs to be run manually after installation. 
+   > For CI/CD pipelines, you can skip this step by setting `SKIP_POSTINSTALL=true` in your environment.
 
    #### Option B: Manual Setup
    - Copy template files to create environment files:

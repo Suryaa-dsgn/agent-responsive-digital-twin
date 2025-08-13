@@ -32,25 +32,36 @@ export function useBackendStatus() {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(true);
 
-  const checkStatus = async () => {
+  const checkStatus = async (signal?: AbortSignal) => {
     setIsChecking(true);
     try {
-      const available = await apiClient.isBackendAvailable();
-      setIsAvailable(available);
+      const available = await apiClient.isBackendAvailable({ signal });
+      if (!signal?.aborted) {
+        setIsAvailable(available);
+      }
     } catch (error) {
-      setIsAvailable(false);
+      if (!signal?.aborted) {
+        setIsAvailable(false);
+      }
     } finally {
-      setIsChecking(false);
+      if (!signal?.aborted) {
+        setIsChecking(false);
+      }
     }
   };
 
   useEffect(() => {
-    checkStatus();
+    const abortController = new AbortController();
+    checkStatus(abortController.signal);
+    
+    return () => {
+      abortController.abort();
+    };
   }, []);
 
   return {
     isAvailable,
     isChecking,
-    retry: checkStatus
+    retry: () => checkStatus()
   };
 }

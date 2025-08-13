@@ -1,8 +1,7 @@
 {
   "version": 2,
   "buildCommand": "cd packages/frontend && npm run build",
-  "outputDirectory": "packages/frontend/.next",
-  "installCommand": "npm ci",
+  "installCommand": "SKIP_POSTINSTALL=true npm ci",
   "rewrites": [
     {
       "source": "/api/backend/:path*",
@@ -20,10 +19,6 @@
         {
           "key": "X-Frame-Options",
           "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
         }
       ]
     },
