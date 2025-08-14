@@ -61,6 +61,13 @@ export default function HomePage() {
                   </NavigationMenuLink>
                 </Link>
               </NavigationMenuItem>
+              <NavigationMenuItem>
+                <Link href="/csp-test" legacyBehavior passHref>
+                  <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                    CSP Test
+                  </NavigationMenuLink>
+                </Link>
+              </NavigationMenuItem>
             </NavigationMenuList>
           </NavigationMenu>
         </div>

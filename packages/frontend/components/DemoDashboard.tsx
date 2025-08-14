@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -15,7 +15,7 @@ import DeveloperCommandInterface from './DeveloperCommandInterface';
 import { SemanticLayerDemo } from './SemanticLayerDemo';
 import { APIEvolutionDemo } from './APIEvolutionDemo';
 
-const GITHUB_REPO_URL = process.env.NEXT_PUBLIC_GITHUB_REPO_URL || 'https://github.com/your-username/your-repository-name';
+const GITHUB_REPO_URL = process.env.NEXT_PUBLIC_GITHUB_REPO_URL || 'https://github.com/Suryaa-dsgn/agent-responsive-digital-twin.git';
 
 // Demo sections for navigation
 const DEMO_SECTIONS = [

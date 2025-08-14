@@ -60,13 +60,16 @@ export function BackendProvider({
       setFailureCount(0); // Reset failure count on success
       setRetryTimeout(checkInterval); // Reset retry timeout
     } catch (error) {
-      setIsBackendAvailable(false);
+            setIsBackendAvailable(false);
       setError(error instanceof Error ? error.message : 'Unknown error');
-      setFailureCount(prev => prev + 1); // Increment failure count
       
-      // Implement exponential backoff for retry (capped at 5 minutes)
+      // Calculate next failure count first
+      const nextFailure = failureCount + 1;
+      setFailureCount(nextFailure);
+      
+      // Implement exponential backoff for retry (capped at 5 minutes) using nextFailure
       const newTimeout = Math.min(
-        checkInterval * Math.pow(2, failureCount), 
+        checkInterval * Math.pow(2, nextFailure),
         300000 // 5 minutes max
       );
       setRetryTimeout(newTimeout);
@@ -79,13 +82,20 @@ export function BackendProvider({
     // Initial check
     checkBackend();
     
-    // Set up dynamic checks with retry logic
-    const intervalId = setInterval(checkBackend, retryTimeout);
+    // Set up periodic checks with dynamic timeout
+    let timeoutId: NodeJS.Timeout;
+    
+    const scheduleNextCheck = () => {
+      timeoutId = setTimeout(() => {
+        checkBackend();
+        scheduleNextCheck();
+      }, retryTimeout);
+    };
+    
+    scheduleNextCheck();
     
     // Clean up on unmount
-    return () => clearInterval(intervalId);
-    
-    // Recreate interval when checkBackend function changes or retry timeout changes
+    return () => clearTimeout(timeoutId);
   }, [checkBackend, retryTimeout]);
   
   const value = {

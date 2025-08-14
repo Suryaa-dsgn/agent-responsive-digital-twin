@@ -10,8 +10,8 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const readlineSync = require('readline-sync');
 const { execSync } = require('child_process');
-const { createInterface } = require('readline');
 const { Writable } = require('stream');
 
 // Setup readline interface
@@ -66,7 +66,7 @@ function askSecret(question) {
     });
     
     // Create custom readline interface that doesn't echo input
-    const secureRl = createInterface({
+    const secureRl = readline.createInterface({
       input: process.stdin,
       output: muted,
       terminal: true
@@ -210,26 +210,41 @@ function copyTemplate(templatePath, destPath) {
   }
   
   try {
-    // Read the template file
-    const content = fs.readFileSync(templatePath, 'utf8');
+    // Get file size
+    const stats = fs.statSync(templatePath);
     
     // Check for unusually large files (potential DoS)
-    if (content.length > 1024 * 50) { // 50KB limit for env files
+    if (stats.size > 1024 * 50) { // 50KB limit for env files
       console.log('\x1b[31mWarning: Template file is unusually large\x1b[0m');
-      const proceed = 'n';
-      if (proceed.toLowerCase() !== 'y') {
+      const readlineSync = require('readline-sync');
+      const proceed = readlineSync.question('Do you want to continue? (y/n): ').trim().toLowerCase();
+      if (proceed !== 'y') {
         return false;
       }
     }
     
-    // Use atomic write pattern with a temporary file
-    const tempFilePath = `${destPath}.tmp`;
+    // Use native OS copy commands which preserve encoding better
+    if (process.platform === 'win32') {
+      // On Windows, use the copy command
+      try {
+        const { execSync } = require('child_process');
+        // Use cmd.exe to run the copy command
+        execSync(`copy "${templatePath.replace(/"/g, '""')}" "${destPath.replace(/"/g, '""')}"`, { shell: 'cmd.exe' });
+      } catch (copyErr) {
+        // Fallback to fs.copyFileSync if the command fails
+        fs.copyFileSync(templatePath, destPath);
+      }
+    } else {
+      // On Unix systems, use copyFileSync
+      fs.copyFileSync(templatePath, destPath);
+    }
     
-    // Write to temp file with secure permissions
-    fs.writeFileSync(tempFilePath, content, { mode: 0o600 }); // Only owner can read/write
-    
-    // Atomically replace the original file
-    fs.renameSync(tempFilePath, destPath);
+    // Set secure permissions
+    try {
+      fs.chmodSync(destPath, 0o600); // Only owner can read/write
+    } catch (permErr) {
+      console.log('\x1b[33mWarning: Could not set secure permissions\x1b[0m');
+    }
     
     return true;
   } catch (err) {
@@ -297,19 +312,20 @@ function updateEnvFile(filePath, key, value) {
     const foundPattern = dangerousPatterns.find(pattern => stringValue.includes(pattern));
     
     if (foundPattern) {
-      console.log(`\x1b[31mWarning: Value contains "${foundPattern}" which might be used for command injection\x1b[0m`);
-      // Escape value by wrapping in quotes to prevent command execution
-      stringValue = JSON.stringify(stringValue).slice(1, -1);
-      console.log('\x1b[33mValue has been escaped for safety\x1b[0m');
+      console.log(`\x1b[31mError: Value contains "${foundPattern}" which could be used for command injection\x1b[0m`);
+      console.log('\x1b[31mRejecting value for security reasons\x1b[0m');
+      return false;
     }
     
     // Read content and validate file exists
     if (!fs.existsSync(filePath)) {
       console.log('\x1b[33mFile does not exist, creating it\x1b[0m');
-      fs.writeFileSync(filePath, '', { mode: 0o600 }); // Secure permissions
+      // Create empty file with UTF-8 BOM for Windows compatibility
+      const emptyWithBOM = Buffer.from([0xEF, 0xBB, 0xBF]);
+      fs.writeFileSync(filePath, emptyWithBOM, { mode: 0o600 }); // Secure permissions
     }
     
-    let content = fs.readFileSync(filePath, 'utf8');
+    let content = fs.readFileSync(filePath, {encoding: 'utf8'});
     
     // Escape regex special characters in the key
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -330,8 +346,11 @@ function updateEnvFile(filePath, key, value) {
     const tempFilePath = `${filePath}.tmp`;
     // Get original file mode to preserve permissions
     const stats = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
-    // Write to temp file with restricted permissions
-    fs.writeFileSync(tempFilePath, content, { mode: 0o600 }); // Only owner can read/write
+    // Write to temp file with restricted permissions - use BOM for Windows compatibility
+    const bomHeader = Buffer.from([0xEF, 0xBB, 0xBF]);
+    const contentBuffer = Buffer.from(content, 'utf8');
+    const dataWithBOM = Buffer.concat([bomHeader, contentBuffer]);
+    fs.writeFileSync(tempFilePath, dataWithBOM, { mode: 0o600 }); // Only owner can read/write
     // Preserve original file mode if it existed
     if (stats) {
       fs.chmodSync(tempFilePath, stats.mode);
@@ -423,12 +442,9 @@ function validateApiKey(key, type = 'general') {
   
   // Check for common API key patterns based on type
   if (type === 'anthropic') {
-    // Anthropic API keys typically start with 'sk-ant-' and are long
+    // Warn if it doesn't match expected pattern but don't reject
     if (!trimmedKey.startsWith('sk-ant-')) {
-      return { 
-        valid: false, 
-        message: 'Anthropic API keys typically start with "sk-ant-"' 
-      };
+      console.log('\x1b[33mWarning: Anthropic API keys typically start with "sk-ant-"\x1b[0m');
     }
     
     // Anthropic keys are typically at least 30 characters
@@ -439,11 +455,11 @@ function validateApiKey(key, type = 'general') {
       };
     }
     
-    // Check for valid Anthropic key format (alphanumeric with hyphens)
-    if (!/^sk-ant-[a-zA-Z0-9-]+$/.test(trimmedKey)) {
+    // Allow more flexible format but still check for dangerous characters
+    if (!/^[a-zA-Z0-9-_]+$/.test(trimmedKey)) {
       return { 
         valid: false, 
-        message: 'Anthropic API key contains invalid characters' 
+        message: 'API key contains invalid characters' 
       };
     }
   }
