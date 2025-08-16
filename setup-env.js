@@ -13,6 +13,7 @@ const readline = require('readline');
 const readlineSync = require('readline-sync');
 const { execSync } = require('child_process');
 const { Writable } = require('stream');
+const os = require('os');
 
 // Setup readline interface
 const rl = readline.createInterface({
@@ -223,25 +224,22 @@ function copyTemplate(templatePath, destPath) {
       }
     }
     
-    // Use native OS copy commands which preserve encoding better
-    if (process.platform === 'win32') {
-      // On Windows, use the copy command
-      try {
-        const { execSync } = require('child_process');
-        // Use cmd.exe to run the copy command
-        execSync(`copy "${templatePath.replace(/"/g, '""')}" "${destPath.replace(/"/g, '""')}"`, { shell: 'cmd.exe' });
-      } catch (copyErr) {
-        // Fallback to fs.copyFileSync if the command fails
-        fs.copyFileSync(templatePath, destPath);
-      }
-    } else {
-      // On Unix systems, use copyFileSync
-      fs.copyFileSync(templatePath, destPath);
+    // Ensure paths are fully resolved to avoid any path traversal
+    const path = require('path');
+    const resolvedTemplatePath = path.resolve(templatePath);
+    const resolvedDestPath = path.resolve(destPath);
+    
+    // Always use fs.copyFileSync which is safe and cross-platform
+    try {
+      fs.copyFileSync(resolvedTemplatePath, resolvedDestPath);
+    } catch (copyErr) {
+      console.log(`\x1b[31mError copying file: ${copyErr.message}\x1b[0m`);
+      return false;
     }
     
     // Set secure permissions
     try {
-      fs.chmodSync(destPath, 0o600); // Only owner can read/write
+      fs.chmodSync(resolvedDestPath, 0o600); // Only owner can read/write
     } catch (permErr) {
       console.log('\x1b[33mWarning: Could not set secure permissions\x1b[0m');
     }
@@ -320,9 +318,14 @@ function updateEnvFile(filePath, key, value) {
     // Read content and validate file exists
     if (!fs.existsSync(filePath)) {
       console.log('\x1b[33mFile does not exist, creating it\x1b[0m');
-      // Create empty file with UTF-8 BOM for Windows compatibility
-      const emptyWithBOM = Buffer.from([0xEF, 0xBB, 0xBF]);
-      fs.writeFileSync(filePath, emptyWithBOM, { mode: 0o600 }); // Secure permissions
+      // Create empty file - only with UTF-8 BOM for Windows compatibility
+      let initialContent;
+      if (process.platform === 'win32') {
+        initialContent = Buffer.from([0xEF, 0xBB, 0xBF]);
+      } else {
+        initialContent = Buffer.from('');
+      }
+      fs.writeFileSync(filePath, initialContent, { mode: 0o600 }); // Secure permissions
     }
     
     let content = fs.readFileSync(filePath, {encoding: 'utf8'});
@@ -346,11 +349,19 @@ function updateEnvFile(filePath, key, value) {
     const tempFilePath = `${filePath}.tmp`;
     // Get original file mode to preserve permissions
     const stats = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
-    // Write to temp file with restricted permissions - use BOM for Windows compatibility
-    const bomHeader = Buffer.from([0xEF, 0xBB, 0xBF]);
+    // Write to temp file with restricted permissions - only add BOM on Windows
     const contentBuffer = Buffer.from(content, 'utf8');
-    const dataWithBOM = Buffer.concat([bomHeader, contentBuffer]);
-    fs.writeFileSync(tempFilePath, dataWithBOM, { mode: 0o600 }); // Only owner can read/write
+    let dataToWrite;
+    
+    // Only add BOM on Windows platforms
+    if (process.platform === 'win32') {
+      const bomHeader = Buffer.from([0xEF, 0xBB, 0xBF]);
+      dataToWrite = Buffer.concat([bomHeader, contentBuffer]);
+    } else {
+      dataToWrite = contentBuffer;
+    }
+    
+    fs.writeFileSync(tempFilePath, dataToWrite, { mode: 0o600 }); // Only owner can read/write
     // Preserve original file mode if it existed
     if (stats) {
       fs.chmodSync(tempFilePath, stats.mode);

@@ -15,7 +15,7 @@ import DeveloperCommandInterface from './DeveloperCommandInterface';
 import { SemanticLayerDemo } from './SemanticLayerDemo';
 import { APIEvolutionDemo } from './APIEvolutionDemo';
 
-const GITHUB_REPO_URL = process.env.NEXT_PUBLIC_GITHUB_REPO_URL || 'https://github.com/Suryaa-dsgn/agent-responsive-digital-twin.git';
+const GITHUB_REPO_URL = process.env.NEXT_PUBLIC_GITHUB_REPO_URL || 'https://github.com/Suryaa-dsgn/agent-responsive-digital-twin';
 
 // Demo sections for navigation
 const DEMO_SECTIONS = [
