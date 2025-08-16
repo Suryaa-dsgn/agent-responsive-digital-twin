@@ -21,6 +21,18 @@ export default function CSPTestButton() {
                   </div>
                 `;
               }
+            })
+            .catch(error => {
+              console.error('CSP Test Error:', error);
+              const resultsElement = document.getElementById('test-results');
+              if (resultsElement) {
+                resultsElement.innerHTML = `
+                  <div class="mt-4 p-3 bg-red-100 border-red-500 border rounded">
+                    <p><strong>Error running CSP tests:</strong> ❌</p>
+                    <p class="text-red-600">${error.message || 'Unknown error occurred'}</p>
+                  </div>
+                `;
+              }
             });
         }}
       >
