@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import Anthropic from '@anthropic-ai/sdk';
+import { Anthropic } from '@anthropic-ai/sdk';
 
 // The Anthropic client will be initialized when needed
 let anthropic: Anthropic;
